@@ -1,17 +1,17 @@
 # Resume Screening App
 
-An intelligent resume screening application that uses machine learning to automatically categorize resumes into different job categories. Built with Python, Streamlit, and scikit-learn.
+An intelligent resume screening application that uses machine learning to automatically categorize resumes into different job categories. Built with Python, Flask, and scikit-learn.
 
 ## Features
 
 - Upload and process resumes in multiple formats (PDF, DOCX, TXT)
 - Automatic text extraction from uploaded documents
 - Machine learning-based resume categorization
-- Clean and intuitive user interface
+- Clean and intuitive web interface
 - Real-time prediction of resume categories
-- Support for multiple resume formats
 - Text cleaning and preprocessing
 - Category prediction with confidence scores
+- REST API for programmatic access
 
 ## Prerequisites
 
@@ -22,57 +22,67 @@ An intelligent resume screening application that uses machine learning to automa
 ## Installation
 
 1. Clone the repository:
-```bash
-git clone https://github.com/Tamanna5/Resume-Screening-App.git
-cd Resume-Screening-App
-```
+    ```bash
+    git clone https://github.com/Tamanna5/Resume-Screening-App.git
+    cd Resume-Screening-App
+    ```
 
 2. Install the required dependencies:
-```bash
-pip install -r requirements.txt
-```
+    ```bash
+    pip install -r requirements.txt
+    ```
 
 ## Required Files
 
-The application requires the following files to function properly:
+The application requires the following files to function properly (place them in the `models/` directory):
 - `clf.pkl` - The trained machine learning model
 - `tfidf.pkl` - The TF-IDF vectorizer
 - `encoder.pkl` - The label encoder
-- `UpdatedResumeDataSet.csv` - Training dataset
 
 ## Usage
 
-1. Start the application:
-```bash
-streamlit run app.py
-```
+1. Start the Flask application:
+    ```bash
+    python app.py
+    ```
 
-2. Open your web browser and navigate to the URL shown in the terminal (typically http://localhost:8501)
+2. Open your web browser and navigate to [http://localhost:5000](http://localhost:5000)
 
-3. Upload a resume file (PDF, DOCX, or TXT format)
+3. Use the web interface to:
+    - Paste resume text or upload a file (PDF, DOCX, or TXT)
+    - View the predicted job category
 
-4. The application will automatically:
-   - Extract text from the uploaded resume
-   - Clean and process the text
-   - Predict the job category
-   - Display the results
+4. You can also use the REST API:
+    - POST to `/classify` with JSON: `{ "resume": "your resume text" }`
 
 ## Project Structure
 
-- `app.py` - Main application file containing the Streamlit interface and processing logic
-- `requirements.txt` - List of Python dependencies
-- `*.pkl` files - Pre-trained models and encoders
-- `UpdatedResumeDataSet.csv` - Dataset used for training the model
-- `Resume Screening with Python.ipynb` - Jupyter notebook containing the model training code
+```
+resume_classifier/
+├── app.py                # Main Flask application file
+├── templates/            # HTML templates
+│   ├── index.html
+│   ├── result.html
+│   └── layout.html
+├── static/               # Static files (CSS, JS)
+│   ├── css/
+│   │   └── style.css
+│   └── js/
+│       └── main.js
+├── models/               # Directory for ML models
+│   ├── tfidf.pkl
+│   ├── clf.pkl
+│   └── encoder.pkl
+├── requirements.txt      # Project dependencies
+└── README.md             # Project documentation
+```
 
 ## Technologies Used
 
-- Streamlit - Web application framework
+- Flask - Web application framework
 - scikit-learn - Machine learning library
-- PyPDF2 - PDF processing
-- python-docx - DOCX file processing
-- pandas - Data manipulation and analysis
-- numpy - Numerical computing
+- PyPDF2 / python-docx - Document processing
+- pandas, numpy - Data manipulation and analysis
 
 ## Model Details
 
