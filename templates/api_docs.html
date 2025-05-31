@@ -1,0 +1,61 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h2 class="mb-0">API Documentation</h2>
+    </div>
+    <div class="card-body">
+        <h3>Resume Classification API</h3>
+        <p class="lead">This API allows you to classify resume texts into predefined professional categories.</p>
+        
+        <h4 class="mt-4">Endpoint: POST /classify</h4>
+        <div class="bg-light p-3 mt-3">
+            <h5>Request Format:</h5>
+            <pre><code>{
+    "resume": "Full resume text here"
+}</code></pre>
+            
+            <h5 class="mt-3">Response Format:</h5>
+            <pre><code>{
+    "category": "Data Science",
+    "confidence": "high"
+}</code></pre>
+            
+            <h5 class="mt-3">Example curl command:</h5>
+            <pre><code>curl -X POST http://localhost:5000/classify \
+    -H "Content-Type: application/json" \
+    -d '{"resume": "I am a data scientist with experience in Python, machine learning, and deep learning..."}'</code></pre>
+            
+            <h5 class="mt-3">Error Responses:</h5>
+            <pre><code>400 Bad Request: {"error": "No resume text provided"}
+500 Internal Server Error: {"error": "Model files not found"}</code></pre>
+        </div>
+        
+        <div class="mt-4">
+            <h4>Integration Example (JavaScript):</h4>
+            <pre><code>async function classifyResume(resumeText) {
+    try {
+        const response = await fetch('/classify', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ resume: resumeText }),
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log(`Category: ${result.category}`);
+        return result;
+    } catch (error) {
+        console.error('Error classifying resume:', error);
+    }
+}</code></pre>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,118 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            {% for message in messages %}
+              <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+        
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h2 class="mb-0">Resume Classification</h2>
+            </div>
+            <div class="card-body">
+                {% if not model_status %}
+                <div class="alert alert-danger">
+                    <strong>Error:</strong> Model files not found. Please ensure the model files are correctly placed in the 'models' directory.
+                </div>
+                {% else %}
+                    <p class="lead">Upload a resume or paste text to classify it into one of our predefined categories.</p>
+                    
+                    <ul class="nav nav-tabs" id="myTab" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="upload-tab" data-bs-toggle="tab" data-bs-target="#upload" type="button" role="tab" aria-controls="upload" aria-selected="true">Upload Resume</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="paste-tab" data-bs-toggle="tab" data-bs-target="#paste" type="button" role="tab" aria-controls="paste" aria-selected="false">Paste Text</button>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content pt-3" id="myTabContent">
+                        <div class="tab-pane fade show active" id="upload" role="tabpanel" aria-labelledby="upload-tab">
+                            <form action="/classify_form" method="POST" enctype="multipart/form-data">
+                                <div class="mb-3">
+                                    <label for="resume_file" class="form-label">Upload Resume (PDF, DOCX, or TXT)</label>
+                                    <input class="form-control" type="file" id="resume_file" name="resume_file" accept=".pdf,.docx,.doc,.txt" required>
+                                    <div class="form-text">Maximum file size: 10MB</div>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Classify Resume</button>
+                            </form>
+                        </div>
+                        <div class="tab-pane fade" id="paste" role="tabpanel" aria-labelledby="paste-tab">
+                            <form action="/classify_form" method="POST">
+                                <div class="mb-3">
+                                    <label for="resume_text" class="form-label">Resume Text</label>
+                                    <textarea class="form-control" id="resume_text" name="resume_text" rows="10" required></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Classify Resume</button>
+                            </form>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header bg-light">
+                <h4 class="mb-0">Supported Categories</h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <ul class="list-group">
+                            <li class="list-group-item">Data Science</li>
+                            <li class="list-group-item">HR</li>
+                            <li class="list-group-item">Advocate</li>
+                            <li class="list-group-item">Arts</li>
+                            <li class="list-group-item">Web Designing</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4">
+                        <ul class="list-group">
+                            <li class="list-group-item">Mechanical Engineer</li>
+                            <li class="list-group-item">Sales</li>
+                            <li class="list-group-item">Health and fitness</li>
+                            <li class="list-group-item">Civil Engineer</li>
+                            <li class="list-group-item">Java Developer</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4">
+                        <ul class="list-group">
+                            <li class="list-group-item">Business Analyst</li>
+                            <li class="list-group-item">Python Developer</li>
+                            <li class="list-group-item">DevOps Engineer</li>
+                            <li class="list-group-item">Network Security Engineer</li>
+                            <li class="list-group-item">Database Administrator</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header bg-light">
+                <h4 class="mb-0">API Usage</h4>
+            </div>
+            <div class="card-body">
+                <p>This service also provides a REST API endpoint for resume classification:</p>
+                <pre><code>POST /classify
+Content-Type: application/json
+
+{
+    "resume": "Your resume text here"
+}
+</code></pre>
+                <a href="/api-docs" class="btn btn-outline-primary btn-sm">View API Documentation</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

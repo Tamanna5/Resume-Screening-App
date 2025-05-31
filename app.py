@@ -1,134 +1,190 @@
-# you need to install all these in your terminal
-# pip install streamlit
-# pip install scikit-learn
-# pip install python-docx
-# pip install PyPDF2
-
-
-import streamlit as st
+from flask import Flask, request, jsonify, render_template, redirect, url_for, flash
 import pickle
-import docx  # Extract text from Word file
-import PyPDF2  # Extract text from PDF
 import re
+import os
+import uuid
+import PyPDF2
+import docx2txt
+from werkzeug.utils import secure_filename
 
-# Load pre-trained model and TF-IDF vectorizer (ensure these are saved earlier)
-svc_model = pickle.load(open('clf.pkl', 'rb'))  # Example file name, adjust as needed
-tfidf = pickle.load(open('tfidf.pkl', 'rb'))  # Example file name, adjust as needed
-le = pickle.load(open('encoder.pkl', 'rb'))  # Example file name, adjust as needed
+app = Flask(__name__)
+app.secret_key = os.urandom(24)
 
+# Configure upload settings
+UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
+ALLOWED_EXTENSIONS = {'pdf', 'docx', 'doc', 'txt'}
+MAX_CONTENT_LENGTH = 10 * 1024 * 1024  # 10MB max file size
 
-# Function to clean resume text
-def cleanResume(txt):
-    cleanText = re.sub(r'http\S+\s', ' ', txt)
-    cleanText = re.sub(r'RT|cc', ' ', cleanText)
-    cleanText = re.sub(r'#\S+\s', ' ', cleanText)
-    cleanText = re.sub(r'@\S+', '  ', cleanText)
-    # Use a raw string for the special characters pattern
-    special_chars = r'[!"#$%&\'()*+,-./:;<=>?@[\]^_`{|}~]'
-    cleanText = re.sub(special_chars, ' ', cleanText)
-    cleanText = re.sub(r'[^\x00-\x7f]', ' ', cleanText)
-    cleanText = re.sub(r'\s+', ' ', cleanText)
-    return cleanText
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
 
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 
-# Function to extract text from PDF
-def extract_text_from_pdf(file):
-    pdf_reader = PyPDF2.PdfReader(file)
-    text = ''
-    for page in pdf_reader.pages:
-        text += page.extract_text()
-    return text
+# Load your saved models
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODELS_DIR = os.path.join(BASE_DIR, 'models')
 
+try:
+    tfidf = pickle.load(open(os.path.join(MODELS_DIR, 'tfidf.pkl'), 'rb'))
+    clf = pickle.load(open(os.path.join(MODELS_DIR, 'clf.pkl'), 'rb'))
+    le = pickle.load(open(os.path.join(MODELS_DIR, 'encoder.pkl'), 'rb'))
+    model_loaded = True
+except Exception as e:
+    print(f"Error loading models: {e}")
+    model_loaded = False
 
-# Function to extract text from DOCX
-def extract_text_from_docx(file):
-    doc = docx.Document(file)
-    text = ''
-    for paragraph in doc.paragraphs:
-        text += paragraph.text + '\n'
-    return text
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-
-# Function to extract text from TXT with explicit encoding handling
-def extract_text_from_txt(file):
-    # Try using utf-8 encoding for reading the text file
+def extract_text_from_pdf(file_path):
+    text = ""
     try:
-        text = file.read().decode('utf-8')
-    except UnicodeDecodeError:
-        # In case utf-8 fails, try 'latin-1' encoding as a fallback
-        text = file.read().decode('latin-1')
+        with open(file_path, 'rb') as f:
+            pdf_reader = PyPDF2.PdfReader(f)
+            for page in pdf_reader.pages:
+                text += page.extract_text() or ""
+    except Exception as e:
+        print(f"Error extracting text from PDF: {e}")
     return text
 
+def extract_text_from_docx(file_path):
+    try:
+        text = docx2txt.process(file_path)
+        return text
+    except Exception as e:
+        print(f"Error extracting text from DOCX: {e}")
+        return ""
 
-# Function to handle file upload and extraction
-def handle_file_upload(uploaded_file):
-    file_extension = uploaded_file.name.split('.')[-1].lower()
+def extract_text_from_file(file_path):
+    file_extension = file_path.rsplit('.', 1)[1].lower()
+    
     if file_extension == 'pdf':
-        text = extract_text_from_pdf(uploaded_file)
-    elif file_extension == 'docx':
-        text = extract_text_from_docx(uploaded_file)
+        return extract_text_from_pdf(file_path)
+    elif file_extension in ['docx', 'doc']:
+        return extract_text_from_docx(file_path)
     elif file_extension == 'txt':
-        text = extract_text_from_txt(uploaded_file)
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            return f.read()
     else:
-        raise ValueError("Unsupported file type. Please upload a PDF, DOCX, or TXT file.")
-    return text
+        return ""
 
+def cleanResume(txt):
+    cleanTxt = re.sub('http\S+\s', ' ', txt)
+    cleanTxt = re.sub('RT|CC', ' ', cleanTxt)
+    cleanTxt = re.sub('#\S+\s', ' ', cleanTxt)
+    cleanTxt = re.sub('@\S+', ' ', cleanTxt)
+    cleanTxt = re.sub('[%s]' % re.escape("""!"#$%&'()*+,-./:;<=>?@[\]^_{|}~"""), ' ', cleanTxt)
+    cleanTxt = re.sub('r[^\x00-\x7f]', ' ', cleanTxt)
+    cleanTxt = re.sub('\s+', ' ', cleanTxt)
+    return cleanTxt
 
-# Function to predict the category of a resume
-def pred(input_resume):
-    # Preprocess the input text (e.g., cleaning, etc.)
-    cleaned_text = cleanResume(input_resume)
+def classify_text(resume_text):
+    """Helper function to classify resume text"""
+    if not resume_text:
+        return None, "No text content found"
+    
+    try:
+        # Clean the resume text
+        cleaned_text = cleanResume(resume_text)
+        
+        # Vectorize
+        vectorized_text = tfidf.transform([cleaned_text])
+        if hasattr(vectorized_text, "toarray"):
+            vectorized_text = vectorized_text.toarray()
+        
+        # Predict
+        prediction = clf.predict(vectorized_text)
+        category = le.inverse_transform(prediction)[0]
+        
+        return category, None
+    except Exception as e:
+        return None, f"Classification error: {str(e)}"
 
-    # Vectorize the cleaned text using the same TF-IDF vectorizer used during training
-    vectorized_text = tfidf.transform([cleaned_text])
+@app.route('/')
+def home():
+    return render_template('index.html', model_status=model_loaded)
 
-    # Convert sparse matrix to dense
-    vectorized_text = vectorized_text.toarray()
-
-    # Prediction
-    predicted_category = svc_model.predict(vectorized_text)
-
-    # get name of predicted category
-    predicted_category_name = le.inverse_transform(predicted_category)
-
-    return predicted_category_name[0]  # Return the category name
-
-
-# Streamlit app layout
-def main():
-    st.set_page_config(page_title="Resume Category Prediction", page_icon="📄", layout="wide")
-
-    st.title("Resume Category Prediction App")
-    st.markdown("Upload a resume in PDF, TXT, or DOCX format and get the predicted job category.")
-
-    # File upload section
-    uploaded_file = st.file_uploader("Upload a Resume", type=["pdf", "docx", "txt"])
-
-    if uploaded_file is not None:
-        # Extract text from the uploaded file
+@app.route('/classify_form', methods=['POST'])
+def classify_form():
+    if not model_loaded:
+        return render_template('index.html', 
+                              model_status=model_loaded, 
+                              error="Model files not found")
+    
+    # Check if the post request has the file part
+    if 'resume_file' in request.files and request.files['resume_file'].filename != '':
+        file = request.files['resume_file']
+        
+        if not allowed_file(file.filename):
+            flash('Invalid file type. Please upload a PDF, DOCX, or TXT file.')
+            return redirect(request.url)
+        
+        # Create unique filename to prevent overwriting
+        unique_filename = secure_filename(f"{uuid.uuid4()}_{file.filename}")
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+        
+        file.save(file_path)
+        
+        # Extract text from file
+        resume_text = extract_text_from_file(file_path)
+        
+        # Delete the file after processing
         try:
-            resume_text = handle_file_upload(uploaded_file)
-            st.success("✅ Successfully extracted the text from the uploaded resume.")
+            os.remove(file_path)
+        except:
+            pass
+        
+    else:
+        resume_text = request.form.get('resume_text', '')
+    
+    if not resume_text:
+        flash('No text found. Please enter text or upload a valid document.')
+        return redirect(url_for('home'))
+    
+    category, error = classify_text(resume_text)
+    
+    if error:
+        flash(error)
+        return redirect(url_for('home'))
+    
+    return render_template('result.html', 
+                         category=category, 
+                         resume_preview=resume_text[:500] + "..." if len(resume_text) > 500 else resume_text)
 
-            # Display extracted text (optional)
-            if st.checkbox("Show extracted text", False):
-                st.text_area("Extracted Resume Text", resume_text, height=300)
+@app.route('/classify', methods=['POST'])
+def classify_resume():
+    if not model_loaded:
+        return jsonify({'error': 'Model files not found'}), 500
+    
+    data = request.get_json()
+    resume_text = data.get('resume', '')
+    
+    if not resume_text:
+        return jsonify({'error': 'No resume text provided'}), 400
+    
+    category, error = classify_text(resume_text)
+    
+    if error:
+        return jsonify({'error': error}), 500
+    
+    return jsonify({
+        'category': category,
+        'confidence': 'high'
+    })
 
-            # Make prediction
-            st.subheader("Prediction Results")
-            category = pred(resume_text)
-            
-            # Create a styled container for the prediction
-            st.markdown("---")
-            st.markdown("### 🎯 Predicted Role")
-            st.markdown(f"<div style='background-color: #f0f2f6; padding: 20px; border-radius: 10px;'>"
-                       f"<h2 style='color: #1f77b4; text-align: center;'>{category}</h2>"
-                       f"</div>", unsafe_allow_html=True)
-            st.markdown("---")
+@app.route('/api-docs')
+def api_docs():
+    return render_template('api_docs.html')
 
-        except Exception as e:
-            st.error(f"Error processing the file: {str(e)}")
+@app.after_request
+def add_header(response):
+    """Add headers to avoid cache"""
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '-1'
+    return response
 
-
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=True, host='0.0.0.0', port=port)
