@@ -11,7 +11,6 @@ An intelligent resume screening application that uses machine learning to automa
 - Real-time prediction of resume categories
 - Text cleaning and preprocessing
 - Category prediction with confidence scores
-- REST API for programmatic access
 
 ## Prerequisites
 
@@ -51,9 +50,6 @@ The application requires the following files to function properly (place them in
 3. Use the web interface to:
     - Paste resume text or upload a file (PDF, DOCX, or TXT)
     - View the predicted job category
-
-4. You can also use the REST API:
-    - POST to `/classify` with JSON: `{ "resume": "your resume text" }`
 
 ## Project Structure
 
