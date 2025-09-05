@@ -96,6 +96,17 @@ Feel free to submit issues and enhancement requests! To contribute:
 4. Push to the branch
 5. Create a Pull Request
 
+## Screenshots
+
+### Home Page
+![Home Page](Screenshot/Home_page.jpg)
+
+### Data Science Resume Classification
+![Data Science Resume](Screenshot/Data_science.jpg)
+
+### Health & Fitness Resume Classification
+![Health & Fitness Resume](Screenshot/Health_fitness.jpg)
+
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+This project is licensed under the MIT License - see the LICENSE file for details.
